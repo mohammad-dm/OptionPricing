@@ -1,1 +1,7 @@
-numpynpandasnscipynmatplotlibnplotlynyfinancenstreamlit
+numpy
+pandas
+scipy
+matplotlib
+plotly
+yfinance
+streamlit
