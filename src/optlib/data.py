@@ -23,7 +23,7 @@ def fetch_stock_data(ticker: str, period_years: int = 4):
     dt = 1 / 252
     mu_hat    = float(log_returns.mean() / dt)
     sigma_hat = float(log_returns.std()  / np.sqrt(dt))
-
+    mu_hat = float(log_returns.mean() / dt + 0.5 * sigma_hat**2)
     current_price = float(prices.iloc[-1])
     return current_price, mu_hat, sigma_hat, prices
 
@@ -45,8 +45,10 @@ def rolling_mu_sigma(ticker: str, end_date: str, max_years: int = 10):
             break
         log_r = np.log(window_data / window_data.shift(1)).dropna()
         dt = 1 / 252
-        mu_list.append(float(log_r.mean() / dt))
-        sigma_list.append(float(log_r.std() / np.sqrt(dt)))
+        sigma_hat = float(log_r.std() / np.sqrt(dt))
+        mu_hat = float(log_r.mean() / dt + 0.5 * sigma_hat**2)
+        mu_list.append(mu_hat)
+        sigma_list.append(sigma_hat)
         periods.append(current_start.strftime("%Y-%m"))
         current_start += pd.DateOffset(months=1)
 
