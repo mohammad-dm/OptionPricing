@@ -4,12 +4,10 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
+from optlib.market import TRADING_DAYS
+from optlib.data import fetch_stock_data, rolling_mu_sigma
 
-from price_data import fetch_stock_data, rolling_mu_sigma
-from model import (
-    Stock, black_scholes, compute_greeks,
-    binomial_american, monte_carlo,
-)
+from optlib.model import Stock, black_scholes, compute_greeks, binomial_american, monte_carlo
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -76,7 +74,7 @@ with st.sidebar:
     st.markdown("---")
     st.subheader("Monte Carlo")
     n_sims  = st.slider("Simulations", 100, 2000, 500, step=100)
-    n_steps = st.slider("Steps (days)", 30, 365, 252, step=1)
+    n_steps = st.slider("Steps (days)", 30, TRADING_DAYS , TRADING_DAYS , step=1)
     n_binom = st.slider("Binomial tree steps", 50, 500, 200, step=50)
 
     st.markdown("---")
@@ -103,7 +101,7 @@ with st.spinner(f"Fetching data for **{ticker}**…"):
 
 sigma = sigma_override if sigma_override is not None else sigma_hat
 K = S * K_pct / 100
-T = T_days / 365
+T = T_days / TRADING_DAYS 
 r = r_pct / 100
 
 stock = Stock(S)
@@ -264,14 +262,14 @@ st.markdown("---")
 
 # ── Option price vs Time to expiry ────────────────────────────────────────────
 st.subheader("Option price vs time to expiry")
-T_range = np.linspace(1/365, 2, 200)
+T_range = np.linspace(1/TRADING_DAYS , 2, 200)
 tc = [black_scholes(S, K, t, r, sigma, "call") for t in T_range]
 tp = [black_scholes(S, K, t, r, sigma, "put")  for t in T_range]
 
 fig_time = go.Figure()
-fig_time.add_trace(go.Scatter(x=T_range*365, y=tc, name="EU Call",
+fig_time.add_trace(go.Scatter(x=T_range*TRADING_DAYS , y=tc, name="EU Call",
     line=dict(color="#3fb950", width=2.5)))
-fig_time.add_trace(go.Scatter(x=T_range*365, y=tp, name="EU Put",
+fig_time.add_trace(go.Scatter(x=T_range*TRADING_DAYS , y=tp, name="EU Put",
     line=dict(color="#f85149", width=2.5)))
 fig_time.add_vline(x=T_days, line_color="rgba(255,255,255,0.5)",
     line_dash="dot", annotation_text=f"T={T_days}d", annotation_position="top right")
@@ -289,10 +287,9 @@ st.markdown("---")
 # ── Monte Carlo simulation ─────────────────────────────────────────────────────
 st.subheader("Monte Carlo price paths")
 with st.spinner("Running Monte Carlo simulation…"):
-    df = monte_carlo(stock, sigma=sigma, r=mu_hat, delta_t=1/365,
-                     n_steps=n_steps, n_simulations=n_sims)
-
-t_axis = np.arange(len(df)) / 365
+    df = monte_carlo(stock, sigma=sigma, r=r, delta_t=T / n_steps,
+                 n_steps=n_steps, n_simulations=n_sims)
+t_axis = np.linspace(0, T, n_steps + 1)
 
 fig_mc = go.Figure()
 show_n = min(n_sims, 300)

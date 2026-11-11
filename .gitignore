@@ -1,1 +1,22 @@
-pycache/n*.pycn.venv/nvenv/n.ipynb_checkpoints/n.vscode/n.idea/
+@'
+
+
+Python
+
+pycache/
+
+*.pyc
+
+*.egg-info/
+
+.venv/
+
+venv/
+
+.ipynb_checkpoints/
+
+.vscode/
+
+.idea/
+
+'@ | Set-Content .gitignore -Encoding ascii

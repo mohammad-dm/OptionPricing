@@ -1,17 +1,17 @@
 import numpy as np
 from scipy.stats import norm
-
+from optlib.market import TRADING_DAYS
 
 class Stock:
     def __init__(self, stock_price):
         self.stock_price = stock_price
 
-    def generate_path(self, sigma, r, delta_t, n_steps):
-        eps = np.random.normal(0, 1, n_steps)
-        increments = r * delta_t + sigma * np.sqrt(delta_t) * eps
-        prices = self.stock_price * np.cumprod(1 + increments)
-        prices = np.insert(prices, 0, self.stock_price)
-        return prices
+    def generate_path(self, sigma, r, delta_t, n_steps, q=0.0, rng=None):
+        rng = rng or np.random.default_rng()
+        eps = rng.standard_normal(n_steps)
+        log_inc = (r - q - 0.5 * sigma**2) * delta_t + sigma * np.sqrt(delta_t) * eps
+        log_path = np.concatenate([[0.0], np.cumsum(log_inc)])
+        return self.stock_price * np.exp(log_path)
 
 
 # ── Black-Scholes ──────────────────────────────────────────────────────────────
@@ -58,11 +58,11 @@ def compute_greeks(S, K, T, r, sigma):
     theta_call = (
         -S * phi_d1 * sigma / (2 * np.sqrt(T))
         - r * K * np.exp(-r * T) * Nd2
-    ) / 365
+    ) / TRADING_DAYS 
     theta_put = (
         -S * phi_d1 * sigma / (2 * np.sqrt(T))
         + r * K * np.exp(-r * T) * Nnd2
-    ) / 365
+    ) / TRADING_DAYS 
 
     vega = S * phi_d1 * np.sqrt(T) / 100   # per 1% move in vol
 
@@ -122,3 +122,19 @@ def monte_carlo(stock, sigma, r, delta_t, n_steps, n_simulations):
     df = pd.DataFrame(results).T
     df.index.name = "Time Step"
     return df
+
+from optlib.market import Market, Option, ExerciseStyle, PricingResult
+
+
+def bs_price(option: Option, market: Market) -> PricingResult:
+    p = black_scholes(market.spot, option.strike, option.expiry,
+                      market.rate, market.vol, option.kind.value)
+    return PricingResult(price=p)
+
+
+def tree_price(option: Option, market: Market, n_steps: int = 200) -> PricingResult:
+    if option.style is not ExerciseStyle.AMERICAN:
+        raise NotImplementedError("European tree comes in Phase 2")
+    p = binomial_american(market.spot, option.strike, option.expiry,
+                          market.rate, market.vol, n_steps, option.kind.value)
+    return PricingResult(price=p)
