@@ -122,3 +122,19 @@ def monte_carlo(stock, sigma, r, delta_t, n_steps, n_simulations):
     df = pd.DataFrame(results).T
     df.index.name = "Time Step"
     return df
+
+from optlib.market import Market, Option, ExerciseStyle, PricingResult
+
+
+def bs_price(option: Option, market: Market) -> PricingResult:
+    p = black_scholes(market.spot, option.strike, option.expiry,
+                      market.rate, market.vol, option.kind.value)
+    return PricingResult(price=p)
+
+
+def tree_price(option: Option, market: Market, n_steps: int = 200) -> PricingResult:
+    if option.style is not ExerciseStyle.AMERICAN:
+        raise NotImplementedError("European tree comes in Phase 2")
+    p = binomial_american(market.spot, option.strike, option.expiry,
+                          market.rate, market.vol, n_steps, option.kind.value)
+    return PricingResult(price=p)
