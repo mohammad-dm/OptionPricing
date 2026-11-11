@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.stats import norm
-
+from optlib.market import TRADING_DAYS
 
 class Stock:
     def __init__(self, stock_price):
@@ -58,11 +58,11 @@ def compute_greeks(S, K, T, r, sigma):
     theta_call = (
         -S * phi_d1 * sigma / (2 * np.sqrt(T))
         - r * K * np.exp(-r * T) * Nd2
-    ) / 365
+    ) / TRADING_DAYS 
     theta_put = (
         -S * phi_d1 * sigma / (2 * np.sqrt(T))
         + r * K * np.exp(-r * T) * Nnd2
-    ) / 365
+    ) / TRADING_DAYS 
 
     vega = S * phi_d1 * np.sqrt(T) / 100   # per 1% move in vol
 

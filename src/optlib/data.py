@@ -1,7 +1,7 @@
 import yfinance as yf
 import numpy as np
 import pandas as pd
-
+from optlib.market import TRADING_DAYS
 
 def fetch_stock_data(ticker: str, period_years: int = 4):
     """
@@ -20,7 +20,7 @@ def fetch_stock_data(ticker: str, period_years: int = 4):
     prices = data["Close"].squeeze()
 
     log_returns = np.log(prices / prices.shift(1)).dropna()
-    dt = 1 / 252
+    dt = 1 / TRADING_DAYS 
     mu_hat    = float(log_returns.mean() / dt)
     sigma_hat = float(log_returns.std()  / np.sqrt(dt))
     mu_hat = float(log_returns.mean() / dt + 0.5 * sigma_hat**2)
@@ -44,7 +44,7 @@ def rolling_mu_sigma(ticker: str, end_date: str, max_years: int = 10):
         if len(window_data) < 2:
             break
         log_r = np.log(window_data / window_data.shift(1)).dropna()
-        dt = 1 / 252
+        dt = 1 / TRADING_DAYS 
         sigma_hat = float(log_r.std() / np.sqrt(dt))
         mu_hat = float(log_r.mean() / dt + 0.5 * sigma_hat**2)
         mu_list.append(mu_hat)
