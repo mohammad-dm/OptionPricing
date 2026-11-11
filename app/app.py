@@ -287,10 +287,9 @@ st.markdown("---")
 # ── Monte Carlo simulation ─────────────────────────────────────────────────────
 st.subheader("Monte Carlo price paths")
 with st.spinner("Running Monte Carlo simulation…"):
-    df = monte_carlo(stock, sigma=sigma, r=mu_hat, delta_t=1/365,
-                     n_steps=n_steps, n_simulations=n_sims)
-
-t_axis = np.arange(len(df)) / 365
+    df = monte_carlo(stock, sigma=sigma, r=r, delta_t=T / n_steps,
+                 n_steps=n_steps, n_simulations=n_sims)
+t_axis = np.linspace(0, T, n_steps + 1)
 
 fig_mc = go.Figure()
 show_n = min(n_sims, 300)
