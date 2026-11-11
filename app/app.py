@@ -5,11 +5,9 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 
-from price_data import fetch_stock_data, rolling_mu_sigma
-from model import (
-    Stock, black_scholes, compute_greeks,
-    binomial_american, monte_carlo,
-)
+from optlib.data import fetch_stock_data, rolling_mu_sigma
+
+from optlib.model import Stock, black_scholes, compute_greeks, binomial_american, monte_carlo
 
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
