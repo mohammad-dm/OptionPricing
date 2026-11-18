@@ -12,6 +12,7 @@ from optlib.model import Stock, black_scholes, compute_greeks, binomial_american
 from datetime import date
 from optlib.data import get_expiries, fetch_option_chain
 from optlib.smile import smile
+from optlib.tree import binomial_tree
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Options Analytics",
@@ -112,8 +113,8 @@ stock = Stock(S)
 # ── Compute prices & greeks ────────────────────────────────────────────────────
 eu_call = black_scholes(S, K, T, r, sigma, "call", q=q)
 eu_put  = black_scholes(S, K, T, r, sigma, "put", q=q)
-am_call = binomial_american(S, K, T, r, sigma, n_binom, "call")
-am_put  = binomial_american(S, K, T, r, sigma, n_binom, "put")
+am_call = binomial_american(S, K, T, r, sigma, n_binom, "call", q=q)
+am_put  = binomial_american(S, K, T, r, sigma, n_binom, "put", q=q)
 greeks  = compute_greeks(S, K, T, r, sigma, q=q)
 
 # ── Top metrics ────────────────────────────────────────────────────────────────
@@ -212,8 +213,8 @@ eu_calls, eu_puts, am_calls, am_puts = [], [], [], []
 for s in spot_range:
     eu_calls.append(black_scholes(s, K, T, r, sigma, "call", q=q))
     eu_puts.append(black_scholes(s, K, T, r, sigma, "put", q=q))
-    am_calls.append(binomial_american(s, K, T, r, sigma, 100, "call"))
-    am_puts.append(binomial_american(s, K, T, r, sigma, 100, "put"))
+    am_calls.append(binomial_american(s, K, T, r, sigma, 100, "call", q=q))
+    am_puts.append(binomial_american(s, K, T, r, sigma, 100, "put", q=q))
 
 fig_price = go.Figure()
 fig_price.add_trace(go.Scatter(x=spot_range, y=eu_calls, name="EU Call",
@@ -407,6 +408,19 @@ fig_hist_price.update_layout(
 st.plotly_chart(fig_hist_price, width="stretch")
 
 st.caption("Black-Scholes (European) · CRR Binomial Tree (American) · GBM Monte Carlo · Data via yfinance")
+
+# ── Early-exercise premium vs dividend yield ──────────────────────
+st.header("Early-exercise premium vs dividend yield")
+q_grid = np.linspace(0, 0.10, 21)
+prem = {kind: [binomial_tree(S, K, T, r, sigma, n_binom, kind, True, qq)
+               - binomial_tree(S, K, T, r, sigma, n_binom, kind, False, qq)
+               for qq in q_grid]
+        for kind in ["call", "put"]}
+fig_ex = go.Figure()
+fig_ex.add_trace(go.Scatter(x=q_grid * 100, y=prem["call"], name="American − European call"))
+fig_ex.add_trace(go.Scatter(x=q_grid * 100, y=prem["put"], name="American − European put"))
+fig_ex.update_layout(xaxis_title="Dividend yield q (%)", yaxis_title="Early-exercise premium ($)")
+st.plotly_chart(fig_ex, use_container_width=True)
 
 # ── Volatility smile ───────────────────────────────────────────────────────────────
 st.header("Volatility smile")

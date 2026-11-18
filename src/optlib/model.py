@@ -72,37 +72,10 @@ def compute_greeks(S, K, T, r, sigma, q=0.0):
 
 # ── Binomial Tree (American) ──────────────────────────────────────────────────
 
-def binomial_american(S, K, T, r, sigma, n_steps=200, option_type="call"):
-    """American option price via CRR binomial tree."""
-    dt = T / n_steps
-    u  = np.exp(sigma * np.sqrt(dt))
-    d  = 1 / u
-    p  = (np.exp(r * dt) - d) / (u - d)
-    disc = np.exp(-r * dt)
+from optlib.tree import binomial_tree
 
-    # Terminal stock prices
-    j = np.arange(n_steps + 1)
-    ST = S * (u ** (n_steps - j)) * (d ** j)
-
-    if option_type == "call":
-        values = np.maximum(ST - K, 0)
-    else:
-        values = np.maximum(K - ST, 0)
-
-    # Backward induction
-    for i in range(n_steps - 1, -1, -1):
-        j = np.arange(i + 1)
-        ST_i = S * (u ** (i - j)) * (d ** j)
-        values = disc * (p * values[:-1] + (1 - p) * values[1:])
-        if option_type == "call":
-            intrinsic = np.maximum(ST_i - K, 0)
-        else:
-            intrinsic = np.maximum(K - ST_i, 0)
-        values = np.maximum(values, intrinsic)
-
-    return float(values[0])
-
-
+def binomial_american(S, K, T, r, sigma, n_steps=200, option_type="call", q=0.0):
+    return binomial_tree(S, K, T, r, sigma, n_steps, option_type, american=True, q=q)
 # ── Monte Carlo ────────────────────────────────────────────────────────────────
 
 def monte_carlo(stock, sigma, r, delta_t, n_steps, n_simulations):
@@ -124,11 +97,12 @@ def bs_price(option: Option, market: Market) -> PricingResult:
     return PricingResult(price=p)
 
 
+
 def tree_price(option: Option, market: Market, n_steps: int = 200) -> PricingResult:
-    if option.style is not ExerciseStyle.AMERICAN:
-        raise NotImplementedError("European tree comes in Phase 2")
-    p = binomial_american(market.spot, option.strike, option.expiry,
-                          market.rate, market.vol, n_steps, option.kind.value)
+    p = binomial_tree(market.spot, option.strike, option.expiry,
+                      market.rate, market.vol, n_steps, option.kind.value,
+                      american=(option.style is ExerciseStyle.AMERICAN),
+                      q=market.div_yield)
     return PricingResult(price=p)
 
 def _bs_vega_raw(S, K, T, r, sigma, q):
