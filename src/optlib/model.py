@@ -130,3 +130,38 @@ def tree_price(option: Option, market: Market, n_steps: int = 200) -> PricingRes
     p = binomial_american(market.spot, option.strike, option.expiry,
                           market.rate, market.vol, n_steps, option.kind.value)
     return PricingResult(price=p)
+
+def _bs_vega_raw(S, K, T, r, sigma, q):
+    """dPrice/dsigma per unit of sigma (not per 1%)."""
+    d1, _ = _d1_d2(S, K, T, r, sigma, q)
+    return S * np.exp(-q * T) * norm.pdf(d1) * np.sqrt(T)
+
+
+def implied_vol(price, S, K, T, r, option_type="call", q=0.0,
+                tol=1e-8, max_iter=100):
+    """Black-Scholes implied volatility: Newton-Raphson with a bisection safety net."""
+    Sq, Kr = S * np.exp(-q * T), K * np.exp(-r * T)
+    if option_type == "call":
+        lower, upper = max(Sq - Kr, 0.0), Sq
+    else:
+        lower, upper = max(Kr - Sq, 0.0), Kr
+    if not (lower < price < upper):
+        raise ValueError(f"price {price:.4f} outside no-arbitrage bounds "
+                         f"({lower:.4f}, {upper:.4f})")
+
+    lo, hi = 1e-6, 5.0              # bracket: sigma between 0.0001% and 500%
+    sigma = 0.2                     # starting guess
+    for _ in range(max_iter):
+        diff = black_scholes(S, K, T, r, sigma, option_type, q) - price
+        if abs(diff) < tol:
+            return sigma
+        if diff > 0:                # price too high -> sigma too high
+            hi = sigma
+        else:
+            lo = sigma
+        vega = _bs_vega_raw(S, K, T, r, sigma, q)
+        new = sigma - diff / vega if vega > 1e-12 else None
+        if new is None or not (lo < new < hi):
+            new = 0.5 * (lo + hi)   # Newton jumped out of the bracket: bisect
+        sigma = new
+    raise RuntimeError("implied_vol did not converge")

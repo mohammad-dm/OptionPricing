@@ -53,3 +53,22 @@ def rolling_mu_sigma(ticker: str, end_date: str, max_years: int = 10):
         current_start += pd.DateOffset(months=1)
 
     return periods, mu_list, sigma_list
+
+def get_expiries(ticker: str) -> list:
+    """Listed option expiry dates, e.g. ['2026-11-20', '2026-11-27', ...]."""
+    return list(yf.Ticker(ticker).options)
+
+
+def fetch_option_chain(ticker: str, expiry: str):
+    """(spot, DataFrame of calls and puts for one expiry, with mid prices)."""
+    tk = yf.Ticker(ticker)
+    spot = float(tk.history(period="5d")["Close"].iloc[-1])
+    chain = tk.option_chain(expiry)
+    frames = []
+    for kind, df in (("call", chain.calls), ("put", chain.puts)):
+        df = df[(df["bid"] > 0) & (df["ask"] > 0)].copy()   # drop dead quotes
+        df["mid"] = (df["bid"] + df["ask"]) / 2
+        df["kind"] = kind
+        frames.append(df[["strike", "bid", "ask", "mid", "impliedVolatility",
+                          "volume", "openInterest", "kind"]])
+    return spot, pd.concat(frames, ignore_index=True)

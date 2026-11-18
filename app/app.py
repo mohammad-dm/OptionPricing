@@ -9,6 +9,9 @@ from optlib.data import fetch_stock_data, rolling_mu_sigma
 
 from optlib.model import Stock, black_scholes, compute_greeks, binomial_american, monte_carlo
 
+from datetime import date
+from optlib.data import get_expiries, fetch_option_chain
+from optlib.smile import smile
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Options Analytics",
@@ -404,3 +407,24 @@ fig_hist_price.update_layout(
 st.plotly_chart(fig_hist_price, width="stretch")
 
 st.caption("Black-Scholes (European) · CRR Binomial Tree (American) · GBM Monte Carlo · Data via yfinance")
+
+# ── Volatility smile ───────────────────────────────────────────────────────────────
+st.header("Volatility smile")
+expiries = st.cache_data(ttl=600)(get_expiries)(ticker)
+if not expiries:
+    st.info(f"No listed options for {ticker}.")
+else:
+    expiry = st.selectbox("Expiry", expiries, index=min(3, len(expiries) - 1))
+    spot, chain = st.cache_data(ttl=600)(fetch_option_chain)(ticker, expiry)
+    T_exp = max(np.busday_count(date.today(), expiry), 1) / TRADING_DAYS
+    sm = smile(chain, spot, T_exp, r, q)
+
+    fig_smile = go.Figure()
+    fig_smile.add_trace(go.Scatter(x=sm["strike"], y=sm["iv"] * 100,
+                                   mode="markers", name="My implied vol"))
+    fig_smile.add_trace(go.Scatter(x=sm["strike"], y=sm["yahoo_iv"] * 100,
+                                   mode="lines", name="Yahoo's IV", line=dict(dash="dot")))
+    fig_smile.add_hline(y=sigma_hat * 100, line_dash="dash", annotation_text="historical σ")
+    fig_smile.add_vline(x=spot, line_dash="dot", annotation_text="spot")
+    fig_smile.update_layout(xaxis_title="Strike", yaxis_title="Implied volatility (%)")
+    st.plotly_chart(fig_smile, use_container_width=True)
