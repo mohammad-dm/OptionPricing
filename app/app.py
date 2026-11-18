@@ -9,6 +9,9 @@ from optlib.data import fetch_stock_data, rolling_mu_sigma
 
 from optlib.model import Stock, black_scholes, compute_greeks, binomial_american, monte_carlo
 
+from datetime import date
+from optlib.data import get_expiries, fetch_option_chain
+from optlib.smile import smile
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Options Analytics",
@@ -83,7 +86,7 @@ with st.sidebar:
 
     run_btn = st.button("▶  Run Analysis", width="stretch", type="primary")
 
-
+q = st.sidebar.number_input("Dividend yield q (%)", 0.0, 20.0, 0.0, step=0.1) / 100
 # ── Main area ──────────────────────────────────────────────────────────────────
 st.title(f"📊 Options Analytics — {ticker}")
 
@@ -107,11 +110,11 @@ r = r_pct / 100
 stock = Stock(S)
 
 # ── Compute prices & greeks ────────────────────────────────────────────────────
-eu_call = black_scholes(S, K, T, r, sigma, "call")
-eu_put  = black_scholes(S, K, T, r, sigma, "put")
+eu_call = black_scholes(S, K, T, r, sigma, "call", q=q)
+eu_put  = black_scholes(S, K, T, r, sigma, "put", q=q)
 am_call = binomial_american(S, K, T, r, sigma, n_binom, "call")
 am_put  = binomial_american(S, K, T, r, sigma, n_binom, "put")
-greeks  = compute_greeks(S, K, T, r, sigma)
+greeks  = compute_greeks(S, K, T, r, sigma, q=q)
 
 # ── Top metrics ────────────────────────────────────────────────────────────────
 st.subheader("Market snapshot")
@@ -158,7 +161,7 @@ spot_range = np.linspace(S * 0.6, S * 1.4, 200)
 greek_series = {g: {"call": [], "put": []} for g in greek_meta}
 
 for s in spot_range:
-    g = compute_greeks(s, K, T, r, sigma)
+    g = compute_greeks(s, K, T, r, sigma, q=q)
     for key in greek_meta:
         greek_series[key]["call"].append(g[key]["call"])
         greek_series[key]["put"].append(g[key]["put"])
@@ -207,8 +210,8 @@ st.subheader("Option price vs spot price (European & American)")
 
 eu_calls, eu_puts, am_calls, am_puts = [], [], [], []
 for s in spot_range:
-    eu_calls.append(black_scholes(s, K, T, r, sigma, "call"))
-    eu_puts.append(black_scholes(s, K, T, r, sigma, "put"))
+    eu_calls.append(black_scholes(s, K, T, r, sigma, "call", q=q))
+    eu_puts.append(black_scholes(s, K, T, r, sigma, "put", q=q))
     am_calls.append(binomial_american(s, K, T, r, sigma, 100, "call"))
     am_puts.append(binomial_american(s, K, T, r, sigma, 100, "put"))
 
@@ -239,8 +242,8 @@ st.markdown("---")
 # ── Option price vs Volatility ─────────────────────────────────────────────────
 st.subheader("Option price vs implied volatility")
 vol_range = np.linspace(0.05, 1.0, 200)
-vc = [black_scholes(S, K, T, r, v, "call") for v in vol_range]
-vp = [black_scholes(S, K, T, r, v, "put")  for v in vol_range]
+vc = [black_scholes(S, K, T, r, v, "call", q=q) for v in vol_range]
+vp = [black_scholes(S, K, T, r, v, "put", q=q)  for v in vol_range]
 
 fig_vol = go.Figure()
 fig_vol.add_trace(go.Scatter(x=vol_range*100, y=vc, name="EU Call",
@@ -263,8 +266,8 @@ st.markdown("---")
 # ── Option price vs Time to expiry ────────────────────────────────────────────
 st.subheader("Option price vs time to expiry")
 T_range = np.linspace(1/TRADING_DAYS , 2, 200)
-tc = [black_scholes(S, K, t, r, sigma, "call") for t in T_range]
-tp = [black_scholes(S, K, t, r, sigma, "put")  for t in T_range]
+tc = [black_scholes(S, K, t, r, sigma, "call", q=q) for t in T_range]
+tp = [black_scholes(S, K, t, r, sigma, "put", q=q)  for t in T_range]
 
 fig_time = go.Figure()
 fig_time.add_trace(go.Scatter(x=T_range*TRADING_DAYS , y=tc, name="EU Call",
@@ -404,3 +407,24 @@ fig_hist_price.update_layout(
 st.plotly_chart(fig_hist_price, width="stretch")
 
 st.caption("Black-Scholes (European) · CRR Binomial Tree (American) · GBM Monte Carlo · Data via yfinance")
+
+# ── Volatility smile ───────────────────────────────────────────────────────────────
+st.header("Volatility smile")
+expiries = st.cache_data(ttl=600)(get_expiries)(ticker)
+if not expiries:
+    st.info(f"No listed options for {ticker}.")
+else:
+    expiry = st.selectbox("Expiry", expiries, index=min(3, len(expiries) - 1))
+    spot, chain = st.cache_data(ttl=600)(fetch_option_chain)(ticker, expiry)
+    T_exp = max(np.busday_count(date.today(), expiry), 1) / TRADING_DAYS
+    sm = smile(chain, spot, T_exp, r, q)
+
+    fig_smile = go.Figure()
+    fig_smile.add_trace(go.Scatter(x=sm["strike"], y=sm["iv"] * 100,
+                                   mode="markers", name="My implied vol"))
+    fig_smile.add_trace(go.Scatter(x=sm["strike"], y=sm["yahoo_iv"] * 100,
+                                   mode="lines", name="Yahoo's IV", line=dict(dash="dot")))
+    fig_smile.add_hline(y=sigma_hat * 100, line_dash="dash", annotation_text="historical σ")
+    fig_smile.add_vline(x=spot, line_dash="dot", annotation_text="spot")
+    fig_smile.update_layout(xaxis_title="Strike", yaxis_title="Implied volatility (%)")
+    st.plotly_chart(fig_smile, use_container_width=True)
