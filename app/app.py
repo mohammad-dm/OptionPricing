@@ -12,7 +12,7 @@ from optlib.model import Stock, black_scholes, compute_greeks, binomial_american
 from datetime import date
 from optlib.data import get_expiries, fetch_option_chain
 from optlib.smile import smile
-from optlib.tree import binomial_tree
+from optlib.tree import binomial_tree, binomial_greeks
 # ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="Options Analytics",
@@ -155,6 +155,14 @@ for i, (key, (label, tip, unit)) in enumerate(greek_meta.items()):
         st.metric(f"{label} (Put)",  f"{g['put']:.4f}{unit}")
 
 st.markdown("---")
+
+st.subheader("American Greeks (from the tree)")
+am = {kind: binomial_greeks(S, K, T, r, sigma, n_binom, kind, True, q) for kind in ["call", "put"]}
+st.dataframe({
+    "": ["price", "delta", "gamma", "theta / day"],
+    "American call": [am["call"]["price"], am["call"]["delta"], am["call"]["gamma"], am["call"]["theta"] / TRADING_DAYS],
+    "American put": [am["put"]["price"], am["put"]["delta"], am["put"]["gamma"], am["put"]["theta"] / TRADING_DAYS],
+})
 
 # ── Greeks vs Spot price ───────────────────────────────────────────────────────
 st.subheader("Greeks vs spot price")
